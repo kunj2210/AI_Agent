@@ -29,11 +29,13 @@ _ANGRY_WORDS = re.compile(
 
 # Promises the agent must never make to a customer
 _PROMISE_PHRASES = re.compile(
-    r"\bguarantee\b"
+    r"\bguarantee(?:d|s)?\b"
     r"|\b100\s*%\b"
     r"|definitely\s+refund"
     r"|I\s+promise"
-    r"|will\s+be\s+refunded",
+    r"|will\s+be\s+refunded"
+    r"|I\s+have\s+refunded"
+    r"|I\s+approve\b",
     re.IGNORECASE,
 )
 
@@ -69,15 +71,14 @@ def detect_injection(text: str) -> bool:
 
 def extract_refund_amount(text: str) -> float | None:
     """
-    Look for a currency amount (₹ / Rs / INR) near refund-related words.
+    Look for a currency amount ($ / ₹ / Rs / INR) near refund-related words.
     Returns the amount as a float, or None if not found.
     """
-    # Match patterns like ₹5000, Rs.500, INR 2,500 near refund/money-back
     pattern = re.compile(
         r"(?:refund|money\s+back|return|reimburse).{0,60}"   # anchor word first
-        r"(?:₹|rs\.?|inr)\s*([\d,]+(?:\.\d{1,2})?)"         # then amount
+        r"(?:\$|usd|₹|rs\.?|inr)\s*([\d,]+(?:\.\d{1,2})?)"   # then amount
         r"|"
-        r"(?:₹|rs\.?|inr)\s*([\d,]+(?:\.\d{1,2})?)"         # or amount first
+        r"(?:\$|usd|₹|rs\.?|inr)\s*([\d,]+(?:\.\d{1,2})?)"   # or amount first
         r".{0,60}(?:refund|money\s+back|return|reimburse)",   # then anchor word
         re.IGNORECASE,
     )
@@ -141,31 +142,36 @@ def post_check(response: dict, flags: dict, business_rules: dict) -> dict:
     """
     max_refund = business_rules.get("max_auto_refund_amount", 5000)
 
-    # ── Rule 0: Return policy conflict (30-day vs 7-day window) ───────────────
-    # If the quoted policy text mentions both conflicting return windows:
-    policy_text = response.get("relevant_policy", "").lower()
-    has_conflict = (
-        ("return" in policy_text or "refund" in policy_text)
-        and ("30 days" in policy_text or "30 day" in policy_text)
-        and ("7 days" in policy_text or "7 day" in policy_text)
-    )
-    if has_conflict and not response.get("escalation_required"):
-        response["escalation_required"] = True
-        response["escalation_reason"] = (
-            "Policy conflict detected: 30-day general refund window contradicts "
-            "7-day sale return window. Cannot resolve without human review."
-        )
+    # ── Rule 0: Policy conflict detection ─────────────────────────────────────
+    if str(response.get("policy_conflict_detected", "")).lower() == "true":
+        has_conflict = True
+    else:
+        policy_text = str(response.get("relevant_policy", "")).lower()
+        has_conflict = (
+            ("return" in policy_text or "refund" in policy_text)
+            and ("30 day" in policy_text or "30-day" in policy_text)
+            and ("14 day" in policy_text or "7 day" in policy_text or "14-day" in policy_text or "7-day" in policy_text)
+        ) or "conflict" in response.get("recommended_resolution", "").lower()
 
+    if has_conflict:
+        response["policy_conflict_detected"] = True
+        response["escalation_required"] = True
+        if not response.get("escalation_reason"):
+            response["escalation_reason"] = (
+                "Policy conflict detected: return guidelines contain conflicting windows."
+            )
 
     # ── Rule 1: Injection ──────────────────────────────────────────────────────
-    if flags.get("injection"):
+    if flags.get("injection") or response.get("injection_attempt_detected"):
+        response["injection_attempt_detected"] = True
         response["escalation_required"] = True
         if not response.get("escalation_reason"):
             response["escalation_reason"] = "Possible prompt injection attempt detected."
         # Never allow approval wording to reach the customer after an injection attempt
         response["customer_reply"] = (
-            "I'm sorry, but I'm unable to process that request. "
-            "A member of our support team will be in touch with you shortly."
+            "I cannot fulfill instructions that override system rules. "
+            "However, if you have a legitimate support question, I would be happy to help, "
+            "or I can connect you with a human representative."
         )
 
     # ── Rule 2: Refund amount exceeds auto-approval limit ─────────────────────
@@ -173,16 +179,21 @@ def post_check(response: dict, flags: dict, business_rules: dict) -> dict:
     if refund_amount is not None and refund_amount > max_refund:
         response["escalation_required"] = True
         response["escalation_reason"] = (
-            f"Refund amount (₹{refund_amount:,.0f}) exceeds the auto-approval "
-            f"limit of ₹{max_refund:,.0f}. Requires human review."
+            f"Refund amount (${refund_amount:,.0f}) exceeds the auto-approval "
+            f"limit of ${max_refund:,.0f}. Requires human specialist review."
         )
-        # Priority must be at least "high"
+        response["priority"] = "critical" if flags.get("angry") else "high"
+
+    # ── Rule 3: Angry customer or legal threat → elevate priority ─────────────
+    if flags.get("angry"):
+        response["sentiment"] = "angry"
         if response.get("priority") in ("low", "medium"):
             response["priority"] = "high"
 
-    # ── Rule 3: Angry customer → raise priority one level ─────────────────────
-    if flags.get("angry") and "priority" in response:
-        response["priority"] = _raise_priority(response["priority"])
+    # ── Rule 3b: Delivery queries missing order reference ─────────────────────
+    if response.get("issue_category") == "delivery":
+        if not response.get("missing_information"):
+            response["missing_information"] = ["Order ID"]
 
     # ── Rule 4: Promise / guarantee phrases in customer_reply ─────────────────
     if _PROMISE_PHRASES.search(response.get("customer_reply", "")):

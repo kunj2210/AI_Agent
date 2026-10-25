@@ -17,7 +17,7 @@ from retriever import get_retriever
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="ShopEasy Support Hub",
+    page_title="ShopEasy",
     page_icon="◈",
     layout="centered",
     initial_sidebar_state="collapsed",
@@ -748,7 +748,7 @@ def render_chat_tab() -> None:
             <div class="header-left">
                 <div class="header-logo">◈</div>
                 <div>
-                    <h1 class="header-title">ShopEasy Support Hub</h1>
+                    <h1 class="header-title">ShopEasy</h1>
                     <p class="header-subtitle">Real-time AI customer resolution & policy compliance</p>
                 </div>
             </div>

@@ -7,40 +7,74 @@ prompts/system_prompt.txt, and provides a safe fallback when it doesn't.
 
 import json
 import re
-from typing import Literal
-from pydantic import BaseModel, ValidationError
+from typing import Literal, Union, Any
+from pydantic import BaseModel, Field, field_validator
 
 
 # ── Pydantic schema ────────────────────────────────────────────────────────────
 
+class PolicyExcerpt(BaseModel):
+    source: str
+    excerpt: str
+
+
 class SupportResponse(BaseModel):
-    """Mirrors the JSON output format defined in prompts/system_prompt.txt."""
+    """Mirrors the exact JSON output format defined in the assignment specification."""
 
     issue_category: Literal[
         "billing", "delivery", "technical_support",
-        "refunds", "account_access", "other"
+        "refund", "refunds", "account_access", "other"
     ]
-    intent:                 str
-    urgency:                Literal["low", "medium", "high", "urgent"]
-    sentiment:              Literal["calm", "frustrated", "angry"]
-    summary:                str
-    priority:               Literal["low", "medium", "high", "urgent"]
-    relevant_policy:        str           # quoted text + source, or "none"
-    recommended_resolution: str
-    escalation_required:    bool
-    escalation_reason:      str           # empty string when not escalating
-    missing_information:    list[str]     # empty list when nothing is missing
-    customer_reply:         str
+    intent:                     str
+    summary:                    str
+    priority:                   Literal["low", "medium", "high", "critical", "urgent"]
+    sentiment:                  Literal["neutral", "calm", "frustrated", "angry"]
+    relevant_policy:            Union[list[PolicyExcerpt], list[dict[str, Any]], str]
+    recommended_resolution:     str
+    escalation_required:        bool
+    escalation_reason:          Union[str, None] = None
+    missing_information:        list[str] = Field(default_factory=list)
+    policy_conflict_detected:   bool = False
+    injection_attempt_detected: bool = False
+    customer_reply:             str
+
+    @field_validator("relevant_policy", mode="before")
+    @classmethod
+    def normalize_relevant_policy(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return [{"source": "knowledge_base", "excerpt": v}] if v and v.lower() != "none" else []
+        if isinstance(v, list):
+            res = []
+            for item in v:
+                if isinstance(item, dict):
+                    res.append(PolicyExcerpt(
+                        source=item.get("source", "knowledge_base"),
+                        excerpt=item.get("excerpt", str(item))
+                    ))
+                elif isinstance(item, str):
+                    res.append(PolicyExcerpt(source="knowledge_base", excerpt=item))
+            return res
+        return []
+
+    @field_validator("sentiment", mode="before")
+    @classmethod
+    def normalize_sentiment(cls, v: str) -> str:
+        if v == "calm":
+            return "neutral"
+        return v
+
+    @field_validator("priority", mode="before")
+    @classmethod
+    def normalize_priority(cls, v: str) -> str:
+        if v == "urgent":
+            return "critical"
+        return v
 
 
 # ── Parsing helpers ────────────────────────────────────────────────────────────
 
 def _strip_code_fences(text: str) -> str:
-    """
-    Remove ```json ... ``` or ``` ... ``` wrappers that the LLM sometimes adds,
-    even though the prompt tells it not to.
-    """
-    # Match an optional language tag after the opening fence
+    """Remove ```json ... ``` or ``` ... ``` wrappers."""
     fenced = re.match(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
     if fenced:
         return fenced.group(1).strip()
@@ -48,10 +82,7 @@ def _strip_code_fences(text: str) -> str:
 
 
 def _extract_json_object(text: str) -> str:
-    """
-    Pull out the first {...} block from the text.
-    Handles cases where the model adds a sentence before or after the JSON.
-    """
+    """Pull out the first {...} block from the text."""
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
         raise ValueError("No JSON object found in LLM output.")
@@ -62,16 +93,7 @@ def _extract_json_object(text: str) -> str:
 
 def parse_and_validate(raw_text: str) -> SupportResponse:
     """
-    Parse `raw_text` from the LLM into a validated SupportResponse.
-
-    Steps:
-      1. Strip markdown code fences.
-      2. Extract the first {...} JSON object.
-      3. json.loads → dict.
-      4. Pydantic validation.
-
-    Raises:
-        ValueError: with a clear message when parsing or validation fails.
+    Parse raw_text from the LLM into a validated SupportResponse.
     """
     try:
         clean    = _strip_code_fences(raw_text)
@@ -82,37 +104,28 @@ def parse_and_validate(raw_text: str) -> SupportResponse:
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid JSON from LLM: {exc}") from exc
 
-    except ValidationError as exc:
-        # Summarise which fields failed so the retry message is useful
-        errors = "; ".join(
-            f"{'.'.join(str(l) for l in e['loc'])}: {e['msg']}"
-            for e in exc.errors()
-        )
-        raise ValueError(f"Schema validation failed — {errors}") from exc
+    except Exception as exc:
+        raise ValueError(f"Schema validation failed — {exc}") from exc
 
 
 def fallback_response(reason: str) -> SupportResponse:
     """
     Return a safe, human-escalation response when the LLM output cannot be
     parsed or validated after all retries are exhausted.
-
-    Args:
-        reason: Internal error description (logged, not shown to customer).
     """
     return SupportResponse(
         issue_category="other",
         intent="Unknown — could not parse LLM response",
-        urgency="high",
-        sentiment="calm",
-        summary=f"Automated parsing failed: {reason}",
+        summary=f"Automated processing escalated: {reason}",
         priority="high",
-        relevant_policy="none",
-        recommended_resolution=(
-            "Parsing failed after max retries. Route to a human agent immediately."
-        ),
+        sentiment="neutral",
+        relevant_policy=[],
+        recommended_resolution="Parsing failed after max retries. Route to a human agent immediately.",
         escalation_required=True,
         escalation_reason=f"LLM output could not be validated: {reason}",
         missing_information=[],
+        policy_conflict_detected=False,
+        injection_attempt_detected=False,
         customer_reply=(
             "I'm sorry, I wasn't able to process your request automatically. "
             "A human agent will follow up with you shortly. "

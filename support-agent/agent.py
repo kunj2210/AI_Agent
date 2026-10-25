@@ -20,6 +20,7 @@ _BASE        = os.path.dirname(__file__)
 _KB_FOLDER   = os.path.join(_BASE, "knowledge_base")
 _PROMPT_FILE       = os.path.join(_BASE, "prompts", "system_prompt.txt")
 _RETRY_PROMPT_FILE = os.path.join(_BASE, "prompts", "retry_prompt.txt")
+_JSON_CFG        = os.path.join(_BASE, "config.json")
 _AGENT_CFG         = os.path.join(_BASE, "config", "agent_config.yaml")
 _BIZ_CFG           = os.path.join(_BASE, "config", "business_rules.yaml")
 
@@ -28,13 +29,17 @@ _BIZ_CFG           = os.path.join(_BASE, "config", "business_rules.yaml")
 
 def load_config() -> dict:
     """
-    Read both YAML files fresh on every call so admin edits apply immediately
-    without restarting the server. Returns a merged dict.
+    Read config fresh on every call so admin edits apply immediately
+    without restarting the server. Prefers config.json if available.
     """
+    if os.path.exists(_JSON_CFG):
+        with open(_JSON_CFG, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+
     with open(_AGENT_CFG, "r", encoding="utf-8") as f:
-        agent = yaml.safe_load(f)
+        agent = yaml.safe_load(f) or {}
     with open(_BIZ_CFG, "r", encoding="utf-8") as f:
-        biz = yaml.safe_load(f)
+        biz = yaml.safe_load(f) or {}
     return {**agent, **biz}
 
 

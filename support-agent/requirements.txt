@@ -1,10 +1,11 @@
-streamlit
+fastapi
+uvicorn
+python-multipart
+pydantic
 scikit-learn
 numpy
-pydantic
 python-dotenv
 pyyaml
-google-generativeai
 google-genai
-groq
+streamlit
 pypdf

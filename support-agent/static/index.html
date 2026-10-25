@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShopEasy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --border: #e2e8f0;
+      --chat-user-bg: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      --chat-bot-bg: linear-gradient(145deg, #0f2b5c 0%, #1e3a8a 100%);
+      --badge-bg: rgba(255, 255, 255, 0.15);
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--primary);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+    .brand-title { font-weight: 700; font-size: 1.15rem; }
+    .brand-subtitle { font-size: 0.8rem; color: var(--text-muted); }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: #f1f5f9;
+      padding: 0.25rem;
+      border-radius: 8px;
+    }
+    .tab-btn {
+      border: none;
+      background: transparent;
+      padding: 0.5rem 1.25rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: #ffffff;
+      color: var(--primary);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    main {
+      flex: 1;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+      display: flex;
+      gap: 1.5rem;
+    }
+
+    .tab-panel { display: none; width: 100%; }
+    .tab-panel.active { display: flex; gap: 1.5rem; }
+
+    /* Chat View */
+    .chat-container {
+      flex: 1.4;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 140px);
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .chat-header {
+      padding: 0.9rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #ffffff;
+    }
+    .chat-messages {
+      flex: 1;
+      padding: 1.5rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .message-row {
+      display: flex;
+      gap: 0.85rem;
+      max-width: 85%;
+      align-items: center;
+    }
+    .message-row.user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    .message-row.bot {
+      align-self: flex-start;
+      align-items: flex-start;
+    }
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid #bfdbfe;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    .message-bubble {
+      padding: 0.85rem 1.25rem;
+      border-radius: 16px;
+      color: #ffffff;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .message-row.user .message-bubble {
+      background: var(--chat-user-bg);
+      border-radius: 16px 16px 4px 16px;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    }
+    .message-row.bot .message-bubble {
+      background: var(--chat-bot-bg);
+      border-radius: 16px 16px 16px 4px;
+      border: 1.5px solid #3b82f6;
+      box-shadow: 0 6px 18px rgba(15, 43, 92, 0.2);
+    }
+
+    .meta-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.6rem;
+    }
+    .pill {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 20px;
+      background: var(--badge-bg);
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+
+    .chat-input-area {
+      padding: 1rem 1.25rem;
+      border-top: 1px solid var(--border);
+      background: #ffffff;
+      display: flex;
+      gap: 0.75rem;
+    }
+    .chat-input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .chat-input:focus { border-color: var(--primary); }
+    .send-btn {
+      padding: 0.75rem 1.5rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .send-btn:hover { background: var(--primary-hover); }
+
+    /* Side Panel JSON Inspector */
+    .side-panel {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      height: calc(100vh - 140px);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .side-panel-header {
+      font-weight: 700;
+      font-size: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .json-viewer {
+      flex: 1;
+      margin-top: 1rem;
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      padding: 1rem;
+      border-radius: 8px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Admin Panel */
+    .admin-container {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    .admin-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-muted); }
+    .form-control {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+    textarea.form-control { min-height: 80px; resize: vertical; }
+    .btn-row { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
+    .btn-secondary { background: #e2e8f0; color: #334155; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    .file-list { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0.85rem;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.88rem;
+    }
+    .btn-delete { color: var(--danger); background: transparent; border: none; cursor: pointer; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-icon">◈</div>
+      <div>
+        <div class="brand-title">ShopEasy</div>
+        <div class="brand-subtitle">AI Customer Support Triage Agent</div>
+      </div>
+    </div>
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('chat')">Chat View</button>
+      <button class="tab-btn" onclick="switchTab('admin')">Admin Config & KB</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Chat View -->
+    <div id="panel-chat" class="tab-panel active">
+      <div class="chat-container">
+        <div class="chat-header">
+          <span style="font-weight: 600; font-size: 0.9rem;">Customer Conversation</span>
+          <button class="btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;" onclick="clearChat()">↻ Clear History</button>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+          <div class="message-row bot">
+            <div class="avatar">🤖</div>
+            <div class="message-bubble">
+              Hello! How can I assist you with your ShopEasy order or policy inquiries today?
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <input type="text" id="chat-input" class="chat-input" placeholder="Type a customer support query..." onkeydown="if(event.key==='Enter') sendMessage()">
+          <button class="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+      </div>
+
+      <div class="side-panel">
+        <div class="side-panel-header">
+          <span>Structured JSON Inspector</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">Live Turn Output</span>
+        </div>
+        <div class="json-viewer" id="json-viewer">// Send a message to inspect the parsed Pydantic triage object...</div>
+        <div class="triage-categories-bar" id="triage-categories-bar" style="margin-top: 1rem; padding: 0.75rem 1rem; background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+          <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-right: 0.25rem;">Triage Badges:</span>
+          <span class="json-pill" id="pill-category" style="font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 20px; background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe;">📁 Category: —</span>
+          <span class="json-pill" id="pill-priority" style="font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 20px; background: #fef3c7; color: #92400e; border: 1px solid #fde68a;">⚡ Priority: —</span>
+          <span class="json-pill" id="pill-sentiment" style="font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 20px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;">🎭 Sentiment: —</span>
+          <span class="json-pill" id="pill-escalation" style="font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 20px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1;">🛡️ Escalation: —</span>
+          <span class="json-pill" id="pill-conflict" style="display: none; font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 20px; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;">⚡ Policy Conflict</span>
+          <span class="json-pill" id="pill-injection" style="display: none; font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 20px; background: #fecdd3; color: #9f1239; border: 1px solid #fda4af;">🛡️ Injection Blocked</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin View -->
+    <div id="panel-admin" class="tab-panel">
+      <div class="admin-container">
+        <!-- Configuration Card -->
+        <div class="admin-card">
+          <div class="card-title">Agent Settings & Support Rules</div>
+          <div class="form-group">
+            <label class="form-label">Agent Role</label>
+            <input type="text" id="cfg-role" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tone of Voice</label>
+            <input type="text" id="cfg-tone" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Supported Topics (comma separated)</label>
+            <input type="text" id="cfg-topics" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Escalation Rules (one per line)</label>
+            <textarea id="cfg-escalation" class="form-control"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Response Boundaries (one per line)</label>
+            <textarea id="cfg-boundaries" class="form-control"></textarea>
+          </div>
+          <div class="btn-row">
+            <button class="send-btn" onclick="saveConfig()">Save Configuration</button>
+            <button class="btn-secondary" onclick="resetConfig()">Reset to Defaults</button>
+          </div>
+        </div>
+
+        <!-- Knowledge Base Management -->
+        <div class="admin-card">
+          <div class="card-title">Knowledge Base Documents (/kb)</div>
+          <div class="form-group">
+            <label class="form-label">Upload .txt or .md Document</label>
+            <input type="file" id="kb-file-input" class="form-control" accept=".txt,.md">
+          </div>
+          <button class="send-btn" onclick="uploadFile()">Upload & Re-index</button>
+          
+          <div style="margin-top: 1.5rem; font-weight: 600; font-size: 0.9rem;">Loaded Knowledge Documents:</div>
+          <div class="file-list" id="file-list">Loading files...</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let history = [];
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      if (tab === 'chat') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('panel-chat').classList.add('active');
+      } else {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('panel-admin').classList.add('active');
+        loadAdmin();
+      }
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+
+      const container = document.getElementById('chat-messages');
+      container.innerHTML += `
+        <div class="message-row user">
+          <div class="avatar">👤</div>
+          <div class="message-bubble">${escapeHtml(text)}</div>
+        </div>
+      `;
+      container.scrollTop = container.scrollHeight;
+
+      // Loading bubble
+      const loadingId = 'loading-' + Date.now();
+      container.innerHTML += `
+        <div class="message-row bot" id="${loadingId}">
+          <div class="avatar">🤖</div>
+          <div class="message-bubble" style="opacity: 0.7;">Analyzing policy documents...</div>
+        </div>
+      `;
+      container.scrollTop = container.scrollHeight;
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message: text, history: history})
+        });
+        const data = await res.json();
+        document.getElementById(loadingId).remove();
+
+        const reply = data.customer_reply || data.reply || "Thank you for reaching out.";
+        history.push({role: 'user', content: text});
+        history.push({role: 'assistant', content: reply});
+
+        container.innerHTML += `
+          <div class="message-row bot">
+            <div class="avatar">🤖</div>
+            <div class="message-bubble">${escapeHtml(reply)}</div>
+          </div>
+        `;
+        container.scrollTop = container.scrollHeight;
+
+        // Update JSON viewer
+        document.getElementById('json-viewer').textContent = JSON.stringify(data, null, 2);
+
+        // Update triage badges under the JSON section
+        document.getElementById('pill-category').textContent = `📁 Category: ${data.issue_category || '—'}`;
+        document.getElementById('pill-priority').textContent = `⚡ Priority: ${data.priority || '—'}`;
+        document.getElementById('pill-sentiment').textContent = `🎭 Sentiment: ${data.sentiment || '—'}`;
+        document.getElementById('pill-escalation').textContent = `🛡️ Escalation: ${data.escalation_required ? 'Yes' : 'No'}`;
+        if (data.escalation_required) {
+          document.getElementById('pill-escalation').style.background = '#fee2e2';
+          document.getElementById('pill-escalation').style.color = '#991b1b';
+          document.getElementById('pill-escalation').style.borderColor = '#fca5a5';
+        } else {
+          document.getElementById('pill-escalation').style.background = '#ecfdf5';
+          document.getElementById('pill-escalation').style.color = '#065f46';
+          document.getElementById('pill-escalation').style.borderColor = '#a7f3d0';
+        }
+
+        const conflictPill = document.getElementById('pill-conflict');
+        conflictPill.style.display = data.policy_conflict_detected ? 'inline-block' : 'none';
+
+        const injectionPill = document.getElementById('pill-injection');
+        injectionPill.style.display = data.injection_attempt_detected ? 'inline-block' : 'none';
+      } catch (err) {
+        document.getElementById(loadingId).remove();
+        container.innerHTML += `
+          <div class="message-row bot">
+            <div class="avatar">🤖</div>
+            <div class="message-bubble" style="background: #ef4444;">Error processing request: ${err.message}</div>
+          </div>
+        `;
+      }
+    }
+
+    function clearChat() {
+      history = [];
+      document.getElementById('chat-messages').innerHTML = `
+        <div class="message-row bot">
+          <div class="avatar">🤖</div>
+          <div class="message-bubble">Hello! How can I assist you with your ShopEasy order or policy inquiries today?</div>
+        </div>
+      `;
+      document.getElementById('json-viewer').textContent = '// Send a message to inspect the parsed Pydantic triage object...';
+      document.getElementById('pill-category').textContent = '📁 Category: —';
+      document.getElementById('pill-priority').textContent = '⚡ Priority: —';
+      document.getElementById('pill-sentiment').textContent = '🎭 Sentiment: —';
+      document.getElementById('pill-escalation').textContent = '🛡️ Escalation: —';
+      document.getElementById('pill-escalation').style.background = '#f1f5f9';
+      document.getElementById('pill-escalation').style.color = '#475569';
+      document.getElementById('pill-escalation').style.borderColor = '#cbd5e1';
+      document.getElementById('pill-conflict').style.display = 'none';
+      document.getElementById('pill-injection').style.display = 'none';
+    }
+
+    async function loadAdmin() {
+      // Load config
+      try {
+        const res = await fetch('/api/config');
+        const cfg = await res.json();
+        document.getElementById('cfg-role').value = cfg.role || '';
+        document.getElementById('cfg-tone').value = cfg.tone || '';
+        document.getElementById('cfg-topics').value = (cfg.supported_topics || []).join(', ');
+        document.getElementById('cfg-escalation').value = (cfg.escalation_rules || []).join('\n');
+        document.getElementById('cfg-boundaries').value = (cfg.response_boundaries || []).join('\n');
+      } catch (e) { console.error(e); }
+
+      // Load files
+      loadFiles();
+    }
+
+    async function loadFiles() {
+      try {
+        const res = await fetch('/api/kb');
+        const data = await res.json();
+        const list = document.getElementById('file-list');
+        list.innerHTML = '';
+        (data.files || []).forEach(f => {
+          list.innerHTML += `
+            <div class="file-item">
+              <span>📄 ${f}</span>
+              <button class="btn-delete" onclick="deleteFile('${f}')">Delete</button>
+            </div>
+          `;
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    async function saveConfig() {
+      const cfg = {
+        role: document.getElementById('cfg-role').value,
+        tone: document.getElementById('cfg-tone').value,
+        supported_topics: document.getElementById('cfg-topics').value.split(',').map(s=>s.trim()).filter(Boolean),
+        escalation_rules: document.getElementById('cfg-escalation').value.split('\n').map(s=>s.trim()).filter(Boolean),
+        response_boundaries: document.getElementById('cfg-boundaries').value.split('\n').map(s=>s.trim()).filter(Boolean)
+      };
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(cfg)
+      });
+      alert('Configuration saved!');
+    }
+
+    async function resetConfig() {
+      if (!confirm('Reset configuration to original defaults?')) return;
+      await fetch('/api/config/reset', { method: 'POST' });
+      loadAdmin();
+      alert('Configuration reset to defaults.');
+    }
+
+    async function uploadFile() {
+      const input = document.getElementById('kb-file-input');
+      if (!input.files.length) return alert('Please choose a file');
+      const formData = new FormData();
+      formData.append('file', input.files[0]);
+      await fetch('/api/kb/upload', { method: 'POST', body: formData });
+      input.value = '';
+      loadFiles();
+      alert('File uploaded and re-indexed successfully!');
+    }
+
+    async function deleteFile(name) {
+      if (!confirm(`Delete ${name}?`)) return;
+      await fetch(`/api/kb/${name}`, { method: 'DELETE' });
+      loadFiles();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+  </script>
+</body>
+</html>

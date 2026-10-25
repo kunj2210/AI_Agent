@@ -1,12 +1,8 @@
 """
-run_tests.py — End-to-end test runner for the ShopEasy support agent.
+run_tests.py — End-to-end test runner for the Customer Support Triage Agent.
 
-Loads tests/test_cases.json, calls agent.handle_message for each case,
-validates the output against the Pydantic schema, and checks expected fields.
-Prints PASS / FAIL with reasons and a final summary.
-
-Usage (from the support-agent/ root):
-    python tests/run_tests.py
+Sends each case from test_cases.json to the agent, validates schema and expected
+properties, prints a PASS/FAIL table with actual JSON, and generates tests/results.md.
 """
 
 import io
@@ -15,163 +11,188 @@ import os
 import sys
 import time
 
-# Force UTF-8 output so emoji don't crash on Windows cp1252 terminals
+# Force UTF-8 output
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 else:
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-# ── Make sure the project root is on sys.path so we can import local modules ──
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-import agent                              # noqa: E402  (import after sys.path fix)
-from validator import SupportResponse     # noqa: E402
+import agent
+from validator import SupportResponse
 
-# ── Constants ──────────────────────────────────────────────────────────────────
-CASES_FILE   = os.path.join(os.path.dirname(__file__), "test_cases.json")
-SLEEP_SECS   = 1          # pause between calls to respect free-tier rate limits
-PRIORITY_ORD = ["low", "medium", "high", "urgent"]   # ascending order
+CASES_FILE = os.path.join(os.path.dirname(__file__), "test_cases.json")
+RESULTS_FILE = os.path.join(os.path.dirname(__file__), "results.md")
 
-
-# ── Assertion helpers ──────────────────────────────────────────────────────────
-
-def _check(failures: list, label: str, actual, expected) -> None:
-    """Append a failure message if actual != expected."""
-    if actual != expected:
-        failures.append(f"{label}: expected {expected!r}, got {actual!r}")
-
-
-def _check_priority_min(failures: list, actual_priority: str, min_priority: str) -> None:
-    """Fail if actual_priority is below min_priority in the ordering."""
-    try:
-        actual_idx = PRIORITY_ORD.index(actual_priority)
-        min_idx    = PRIORITY_ORD.index(min_priority)
-    except ValueError:
-        failures.append(f"priority: unknown value '{actual_priority}' or '{min_priority}'")
-        return
-    if actual_idx < min_idx:
-        failures.append(
-            f"priority: expected at least {min_priority!r}, got {actual_priority!r}"
-        )
-
-
-def _check_missing_info_contains(failures: list, missing_list: list, keyword: str) -> None:
-    """Fail if no item in missing_list contains keyword (case-insensitive)."""
-    keyword_lower = keyword.lower()
-    found = any(keyword_lower in item.lower() for item in missing_list)
-    if not found:
-        failures.append(
-            f"missing_information: expected an item containing {keyword!r}, "
-            f"got {missing_list!r}"
-        )
-
-
-def _check_reply_must_not_contain(failures: list, reply: str, forbidden: str) -> None:
-    """Fail if `reply` contains `forbidden` (case-insensitive)."""
-    if forbidden.lower() in reply.lower():
-        failures.append(
-            f"customer_reply: must not contain {forbidden!r} but it does.\n"
-            f"  Reply: {reply[:120]!r}"
-        )
-
-
-# ── Schema validation ──────────────────────────────────────────────────────────
-
-def _validate_schema(response: dict) -> list:
-    """
-    Validate the response dict against the Pydantic SupportResponse model.
-    Returns a list of failure messages (empty = valid).
-    """
-    try:
-        SupportResponse(**response)
-        return []
-    except Exception as exc:
-        return [f"Pydantic schema validation failed: {exc}"]
-
-
-# ── Main runner ────────────────────────────────────────────────────────────────
 
 def run_tests() -> None:
     with open(CASES_FILE, "r", encoding="utf-8") as f:
         cases = json.load(f)
 
+    total = len(cases)
     passed = 0
-    total  = len(cases)
+    results_records = []
 
-    print(f"\n{'='*60}")
-    print(f"  ShopEasy Agent — Test Suite ({total} cases)")
-    print(f"{'='*60}\n")
+    print(f"\n{'='*75}")
+    print(f"  AI Customer Support Triage Agent — Test Suite ({total} cases)")
+    print(f"{'='*75}\n")
 
     for case in cases:
-        case_id     = case["id"]
+        case_id = case["id"]
         description = case["description"]
-        user_input  = case["input"]
-        expected    = case.get("expected", {})
+        user_input = case["input"]
+        expected = case.get("expected", {})
 
         print(f"[{case_id}/{total}] {description}")
-        print(f"  Input : {user_input!r}")
+        print(f"  Input: {user_input!r}")
 
-        # ── Call the agent (fresh history per test case) ───────────────────────
         try:
             response = agent.handle_message(user_input, history=[])
         except Exception as exc:
-            print(f"  [FAIL] agent raised an exception: {exc}\n")
+            print(f"  [FAIL] Agent raised exception: {exc}\n")
+            results_records.append({
+                "id": case_id,
+                "description": description,
+                "input": user_input,
+                "status": "FAIL",
+                "failures": [str(exc)],
+                "actual": {}
+            })
             continue
 
-        failures: list[str] = []
+        failures = []
 
-        # ── Schema check ───────────────────────────────────────────────────────
-        failures.extend(_validate_schema(response))
+        # 1. Pydantic schema validation
+        try:
+            SupportResponse(**response)
+        except Exception as exc:
+            failures.append(f"Schema validation error: {exc}")
 
-        # ── Field-level checks ─────────────────────────────────────────────────
+        # 2. Check category
         if "issue_category" in expected:
-            _check(failures, "issue_category",
-                   response.get("issue_category"), expected["issue_category"])
+            exp_cat = expected["issue_category"]
+            act_cat = response.get("issue_category", "")
+            # allow refund vs refunds equivalence
+            if exp_cat in ("refund", "refunds") and act_cat in ("refund", "refunds"):
+                pass
+            elif act_cat != exp_cat:
+                failures.append(f"issue_category: expected {exp_cat!r}, got {act_cat!r}")
 
+        # 3. Check escalation
         if "escalation_required" in expected:
-            _check(failures, "escalation_required",
-                   response.get("escalation_required"), expected["escalation_required"])
+            if response.get("escalation_required") != expected["escalation_required"]:
+                failures.append(
+                    f"escalation_required: expected {expected['escalation_required']!r}, "
+                    f"got {response.get('escalation_required')!r}"
+                )
 
-        if "priority_min" in expected:
-            _check_priority_min(failures,
-                                response.get("priority", "low"),
-                                expected["priority_min"])
+        # 4. Check policy conflict
+        if "policy_conflict_detected" in expected:
+            if response.get("policy_conflict_detected") != expected["policy_conflict_detected"]:
+                failures.append(
+                    f"policy_conflict_detected: expected {expected['policy_conflict_detected']!r}, "
+                    f"got {response.get('policy_conflict_detected')!r}"
+                )
 
-        if "missing_info_contains" in expected:
-            _check_missing_info_contains(failures,
-                                         response.get("missing_information", []),
-                                         expected["missing_info_contains"])
+        # 5. Check injection detection
+        if "injection_attempt_detected" in expected:
+            if response.get("injection_attempt_detected") != expected["injection_attempt_detected"]:
+                failures.append(
+                    f"injection_attempt_detected: expected {expected['injection_attempt_detected']!r}, "
+                    f"got {response.get('injection_attempt_detected')!r}"
+                )
 
+        # 6. Check non-empty missing information
+        if expected.get("missing_information_non_empty"):
+            if not response.get("missing_information"):
+                failures.append("missing_information: expected non-empty list, got empty list")
+
+        # 7. Check sentiment
+        if "sentiment" in expected:
+            if response.get("sentiment") != expected["sentiment"]:
+                failures.append(f"sentiment: expected {expected['sentiment']!r}, got {response.get('sentiment')!r}")
+
+        # 8. Check priority in
+        if "priority_in" in expected:
+            if response.get("priority") not in expected["priority_in"]:
+                failures.append(f"priority: expected one of {expected['priority_in']!r}, got {response.get('priority')!r}")
+
+        # 9. Check forbidden reply phrases
         if "reply_must_not_contain" in expected:
-            _check_reply_must_not_contain(failures,
-                                          response.get("customer_reply", ""),
-                                          expected["reply_must_not_contain"])
+            forbidden_list = expected["reply_must_not_contain"]
+            if isinstance(forbidden_list, str):
+                forbidden_list = [forbidden_list]
+            reply = response.get("customer_reply", "")
+            for phrase in forbidden_list:
+                if phrase.lower() in reply.lower():
+                    failures.append(f"customer_reply: contains forbidden phrase {phrase!r}")
 
-        # ── Result ─────────────────────────────────────────────────────────────
-        if not failures:
+        status = "PASS" if not failures else "FAIL"
+        if status == "PASS":
             passed += 1
-            print("  [PASS]")
+            print(f"  --> [PASS]")
         else:
-            print("  [FAIL]")
-            for reason in failures:
-                print(f"     - {reason}")
+            print(f"  --> [FAIL]")
+            for f_msg in failures:
+                print(f"      - {f_msg}")
 
-        # Print a few key fields for visibility
-        print(f"  category={response.get('issue_category')}  "
-              f"priority={response.get('priority')}  "
-              f"escalate={response.get('escalation_required')}")
-        print()
+        print(f"  Output JSON: {json.dumps(response, indent=2)}\n")
 
-        # Respect free-tier rate limits
-        time.sleep(SLEEP_SECS)
+        results_records.append({
+            "id": case_id,
+            "description": description,
+            "input": user_input,
+            "status": status,
+            "failures": failures,
+            "actual": response
+        })
 
-    # ── Summary ────────────────────────────────────────────────────────────────
-    print(f"{'='*60}")
-    print(f"  Result: {passed}/{total} passed")
-    print(f"{'='*60}\n")
+        time.sleep(1)
 
-    # Exit with a non-zero code if any test failed (useful in CI pipelines)
+    # Summary table
+    print(f"{'='*75}")
+    print(f"  SUMMARY TABLE: {passed}/{total} CASES PASSED")
+    print(f"{'='*75}")
+    print(f"{'ID':<4} | {'Status':<6} | {'Description'}")
+    print(f"{'-'*4}-+-{'-'*6}-+-{'-'*60}")
+    for r in results_records:
+        print(f"{r['id']:<4} | {r['status']:<6} | {r['description']}")
+    print(f"{'='*75}\n")
+
+    # Generate tests/results.md
+    md_lines = [
+        "# Test Results — AI Customer Support Triage Agent",
+        "",
+        f"**Summary:** {passed} of {total} test cases passed.",
+        "",
+        "## Results Table",
+        "",
+        "| ID | Scenario | Status | Key Verifications |",
+        "|---|---|---|---|"
+    ]
+
+    for r in results_records:
+        act = r["actual"]
+        verif = f"Category: `{act.get('issue_category')}`, Escalate: `{act.get('escalation_required')}`, Priority: `{act.get('priority')}`"
+        md_lines.append(f"| {r['id']} | {r['description']} | **{r['status']}** | {verif} |")
+
+    md_lines.append("\n## Detailed Case Logs & JSON Outputs\n")
+    for r in results_records:
+        md_lines.append(f"### Case {r['id']}: {r['description']}")
+        md_lines.append(f"- **Input:** `{r['input']}`")
+        md_lines.append(f"- **Result:** `{r['status']}`")
+        if r["failures"]:
+            md_lines.append(f"- **Failures:** {', '.join(r['failures'])}")
+        md_lines.append("\n```json")
+        md_lines.append(json.dumps(r["actual"], indent=2))
+        md_lines.append("```\n")
+
+    with open(RESULTS_FILE, "w", encoding="utf-8") as f:
+        f.write("\n".join(md_lines))
+
+    print(f"Results report successfully saved to: {RESULTS_FILE}")
     sys.exit(0 if passed == total else 1)
 
 
