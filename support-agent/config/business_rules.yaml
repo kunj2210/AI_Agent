@@ -1,0 +1,23 @@
+# ShopEasy Business Rules — operational limits and retrieval settings
+
+# Maximum refund amount (INR) the agent can approve automatically without human review
+max_auto_refund_amount: 5000
+
+# Number of days after purchase within which a refund request is valid
+refund_window_days: 30
+
+# Minimum cosine similarity score for a knowledge-base result to be used in a response
+# (scores below this threshold mean "no relevant article found")
+min_retrieval_score: 0.1
+
+# Maximum number of times the agent will retry answering before escalating to a human
+max_retries: 2
+
+# Standard delivery SLA in business days (used when quoting expected delivery times)
+standard_delivery_sla_days: 5
+
+# Express delivery SLA in business days
+express_delivery_sla_days: 2
+
+# Number of knowledge-base articles to retrieve and pass to the LLM as context
+top_k_results: 3

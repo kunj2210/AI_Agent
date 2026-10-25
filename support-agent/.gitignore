@@ -1,0 +1,32 @@
+# Environment & Secrets (NEVER commit these)
+.env
+.env.*
+!.env.example
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Testing & Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

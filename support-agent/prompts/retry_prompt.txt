@@ -1,0 +1,2 @@
+Your previous response had a JSON error: {error}
+Please fix it and reply with ONLY a valid JSON object.
