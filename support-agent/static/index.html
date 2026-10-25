@@ -296,6 +296,149 @@
       font-size: 0.88rem;
     }
     .btn-delete { color: var(--danger); background: transparent; border: none; cursor: pointer; font-weight: 600; }
+
+    /* ========================================================
+       RESPONSIVE DESIGN SYSTEM (Desktop, Tablet, Mobile)
+       ======================================================== */
+
+    /* Tablet & Medium Screens (max-width: 1024px) */
+    @media (max-width: 1024px) {
+      main {
+        padding: 1.25rem;
+        gap: 1.25rem;
+      }
+      .tab-panel.active {
+        gap: 1.25rem;
+      }
+      .chat-container, .side-panel {
+        height: calc(100vh - 130px);
+      }
+    }
+
+    /* Small Tablets & Mobile Stack (max-width: 880px) */
+    @media (max-width: 880px) {
+      header {
+        padding: 0.85rem 1.25rem;
+      }
+      main {
+        padding: 1rem;
+      }
+      .tab-panel.active {
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+      .chat-container {
+        flex: none;
+        width: 100%;
+        height: 540px;
+      }
+      .side-panel {
+        flex: none;
+        width: 100%;
+        height: 480px;
+      }
+      .admin-container {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+      }
+      .message-row {
+        max-width: 90%;
+      }
+    }
+
+    /* Mobile Phones (max-width: 640px) */
+    @media (max-width: 640px) {
+      header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+      }
+      .brand {
+        justify-content: flex-start;
+      }
+      .brand-title {
+        font-size: 1.05rem;
+      }
+      .brand-subtitle {
+        font-size: 0.75rem;
+      }
+      .nav-tabs {
+        width: 100%;
+      }
+      .tab-btn {
+        flex: 1;
+        text-align: center;
+        padding: 0.5rem 0.5rem;
+        font-size: 0.8rem;
+      }
+      main {
+        padding: 0.75rem;
+      }
+      .chat-container {
+        height: 480px;
+        border-radius: 10px;
+      }
+      .chat-header {
+        padding: 0.75rem 1rem;
+      }
+      .chat-messages {
+        padding: 1rem 0.75rem;
+        gap: 0.75rem;
+      }
+      .message-row {
+        max-width: 95%;
+        gap: 0.6rem;
+      }
+      .message-bubble {
+        padding: 0.75rem 1rem;
+        font-size: 0.88rem;
+      }
+      .avatar {
+        width: 30px;
+        height: 30px;
+        font-size: 0.95rem;
+      }
+      .chat-input-area {
+        padding: 0.75rem;
+        gap: 0.5rem;
+      }
+      .chat-input {
+        padding: 0.65rem 0.85rem;
+        font-size: 0.88rem;
+      }
+      .send-btn {
+        padding: 0.65rem 1.1rem;
+        font-size: 0.88rem;
+      }
+      .side-panel {
+        height: 420px;
+        padding: 1rem;
+        border-radius: 10px;
+      }
+      .json-viewer {
+        font-size: 0.75rem;
+        padding: 0.75rem;
+      }
+      .triage-categories-bar {
+        padding: 0.6rem 0.75rem !important;
+        gap: 0.4rem !important;
+      }
+      .json-pill {
+        font-size: 0.7rem !important;
+        padding: 0.2rem 0.5rem !important;
+      }
+      .admin-card {
+        padding: 1.1rem;
+        border-radius: 10px;
+      }
+      .btn-row {
+        flex-direction: column;
+      }
+      .btn-row button {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
