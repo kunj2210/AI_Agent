@@ -88,10 +88,10 @@ copy .env.example .env
 # On macOS/Linux
 cp .env.example .env
 ```
-Open `.env` and add your Groq API key:
+Open `.env` and add your Gemini API key:
 ```env
-GROQ_API_KEY=gsk_your_actual_key_here
-MODEL_NAME=qwen/qwen3.8-27b
+GEMINI_API_KEY=your_gemini_api_key_here
+MODEL_NAME=gemini-1.5-flash
 TEMPERATURE=0.2
 ```
 
@@ -106,8 +106,8 @@ streamlit run app.py
 
 | Variable | Purpose | Example |
 | :--- | :--- | :--- |
-| `GROQ_API_KEY` | Authentication key for Groq Cloud API | `gsk_o31SLS9Atx...` |
-| `MODEL_NAME` | LLM model identifier on Groq | `qwen/qwen3.8-27b` or `llama-3.3-70b-versatile` |
+| `GEMINI_API_KEY` | Authentication key for Google Gemini API | `AIzaSy...` |
+| `MODEL_NAME` | Gemini model identifier | `gemini-1.5-flash` or `gemini-1.5-pro` |
 | `TEMPERATURE` | Controls response randomness (low = deterministic & factual) | `0.2` |
 
 ---

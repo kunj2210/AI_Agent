@@ -4,5 +4,7 @@ numpy
 pydantic
 python-dotenv
 pyyaml
+google-generativeai
+google-genai
 groq
 pypdf
